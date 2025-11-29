@@ -98,12 +98,12 @@
             color: #1f2937;
             font-weight: 600;
             border-bottom: 1px solid #e2e8f0;
-            padding: 1rem 1.5rem;
+            padding: 0.5rem 1rem;
             font-size: 0.875rem;
         }
 
         .table tbody td {
-            padding: 1rem 1.5rem;
+            padding: 0.5rem 1rem;
             vertical-align: middle;
             color: #374151;
             border-bottom: 1px solid #f1f5f9;
@@ -118,11 +118,13 @@
             color: #1f2937 !important;
             font-weight: 600 !important;
             text-align: center;
-            padding: 1rem;
+            padding: 0.15rem 0.25rem;
+            font-size: 0.8125rem;
         }
 
         .position-stats-table tbody td {
-            padding: 0.875rem 1rem;
+            padding: 0.15rem 0.25rem;
+            font-size: 0.75rem;
         }
 
         .position-stats-table tbody td:first-child {
@@ -161,11 +163,12 @@
                     <i class="bi bi-graph-up"></i>
                     Analytics
                 </a>
-
+                {% if is_admin %}
                 <a class="nav-link" href="/users">
                     <i class="bi bi-people"></i>
                     User Management
                 </a>
+                {% endif %}
                 <a class="nav-link" href="/logout">
                     <i class="bi bi-box-arrow-right"></i>
                     Logout
@@ -205,23 +208,23 @@
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Monthly Statistics</h5>
-
-                <div class="table-responsive numeric-view">
-                    <table class="table table-bordered mb-0">
+        <div class="card mb-3">
+            <div class="card-body p-1">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title mb-0" style="font-size: 1rem;">Monthly Statistics</h5>
+                </div>
+                <div class="table-responsive numeric-view mb-0">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.875rem;">
                         <thead>
                             <tr>
-                                <th>Month</th>
-
-                                <th>Accepted</th>
-                                <th>Rejected</th>
-                                <th>In Notice</th>
-                                <th>Joined</th>
+                                <th class="py-1">Month</th>
+                                <th class="py-1">Accepted</th>
+                                <th class="py-1">Rejected</th>
+                                <th class="py-1">In Notice</th>
+                                <th class="py-1">Joined</th>
                             </tr>
                         </thead>
-                        <tbody id="monthlyStatisticsBody">
+                        <tbody id="monthlyStatisticsBody" style="font-size: 0.8125rem;">
                             <!-- Monthly statistics data will be loaded here by JavaScript -->
                         </tbody>
                     </table>
@@ -233,32 +236,31 @@
         <!-- ============================================= -->
         <!-- POSITION STATISTICS TABLE STARTS HERE        -->
         <!-- ============================================= -->
-        <div class="card mb-4"
-            style="border: 5px solid #d8b4d8; background: linear-gradient(to right, #fff 0%, #f9f5f9 100%); box-shadow: 0 4px 12px rgba(216, 180, 216, 0.5);">
-            <div class="card-body">
-                <h5 class="card-title mb-4"
-                    style="color: #8b4789; font-weight: 700; font-size: 1.75rem; text-align: center; border-bottom: 3px solid #d8b4d8; padding-bottom: 1rem;">
-                    POSITION STATISTICS TABLE
-                </h5>
-                <div class="table-responsive">
-                    <table class="table table-bordered position-stats-table mb-0" style="border: 2px solid #d8b4d8;">
-                        <thead>
-                            <tr>
-                                <th style="width: 60%; font-size: 1.1rem;">Position</th>
-                                <th style="width: 20%; font-size: 1.1rem;">Applied</th>
-                                <th style="width: 20%; font-size: 1.1rem;">Joined</th>
-                            </tr>
-                        </thead>
-                        <tbody id="positionStatisticsBody">
-                            <tr style="background-color: #fff3cd;">
-                                <td colspan="3" class="text-center"
-                                    style="font-weight: bold; color: #856404; padding: 2rem; font-size: 1.2rem;">⏳
-                                    LOADING POSITION DATA...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-body p-3">
+                        <h5 class="card-title mb-3">Position Statistics</h5>
+
+                        <div class="table-responsive numeric-view mb-0">
+                            <table class="table table-bordered table-sm mb-0" style="font-size: 0.875rem;">
+                                <thead>
+                                    <tr>
+                                        <th class="py-1">Position</th>
+                                        <th class="py-1">Applied</th>
+                                        <th class="py-1">Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positionStatisticsBody" style="font-size: 0.8125rem;">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-1" style="font-weight: bold; color: #856404;">⏳ LOADING POSITION DATA...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="positionStatisticsChart" style="display: none; height: 300px;"></div>
+                    </div>
                 </div>
-                <div id="positionStatisticsChart" style="display: none; height: 300px;"></div>
             </div>
         </div>
         <!-- ============================================= -->
@@ -331,15 +333,131 @@
             toggleView(event.target.value);
         }
 
+        // Function to populate year dropdown
+        // Year filter functionality removed as requested
+        
+        // Function to fetch analytics data with optional year filter
+        function fetchAnalyticsData() {
+            console.log('Fetching analytics data');
+            
+            // Construct URL without year parameter
+            let url = '/api/analytics';
+            console.log('API URL:', url);
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Analytics data received:', data);
+                    console.log('Monthly statistics count:', data.monthly_statistics ? data.monthly_statistics.length : 0);
+                    
+                    // OVERALL APPLICATION STATUS
+                    const overallAnalyticsList = document.getElementById('overallAnalyticsList');
+                    if (overallAnalyticsList) {
+                        overallAnalyticsList.innerHTML = `
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">Total Applicants</div>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">${data.total_applicant}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">Rejected</div>
+                                </div>
+                                <span class="badge bg-danger rounded-pill">${data.total_rejected}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">No Response</div>
+                                </div>
+                                <span class="badge bg-warning text-dark rounded-pill">${data.no_response}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">Not Interviewed</div>
+                                </div>
+                                <span class="badge bg-info text-dark rounded-pill">${data.not_interviewed}</span>
+                            </li>
+                        `;
+                    }
+                    
+                    // HIRING FUNNEL STATUS
+                    const hiringFunnelList = document.getElementById('hiringFunnelList');
+                    if (hiringFunnelList) {
+                        let hiringFunnelHTML = '';
+                        data.hiring_funnel_by_role.forEach(role => {
+                            hiringFunnelHTML += `
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">${role.role}</div>
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">${role.count}</span>
+                                </li>
+                            `;
+                        });
+                        hiringFunnelList.innerHTML = hiringFunnelHTML;
+                    }
+                    
+                    // MONTHLY STATISTICS
+                    const monthlyStatisticsBody = document.getElementById('monthlyStatisticsBody');
+                    if (monthlyStatisticsBody) {
+                        if (data.monthly_statistics && data.monthly_statistics.length > 0) {
+                            monthlyStatisticsBody.innerHTML = data.monthly_statistics.map(item => `
+                                <tr>
+                                    <td>${item.month}</td>
+                                    <td>${item.accepted}</td>
+                                    <td>${item.rejected}</td>
+                                    <td>${item.in_notice}</td>
+                                    <td>${item.joined}</td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            monthlyStatisticsBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No monthly data available</td></tr>';
+                        }
+                    }
+                    
+                    // POSITION STATISTICS
+                    const positionStatisticsBody = document.getElementById('positionStatisticsBody');
+                    
+                    if (positionStatisticsBody) {
+                        if (data.position_statistics && data.position_statistics.length > 0) {
+                            const tableHTML = data.position_statistics.map(item => `
+                                <tr>
+                                    <td>${item.position || 'N/A'}</td>
+                                    <td class="text-center">${item.applied || 0}</td>
+                                    <td class="text-center">${item.joined || 0}</td>
+                                </tr>
+                            `).join('');
+                            positionStatisticsBody.innerHTML = tableHTML;
+                        } else {
+                            positionStatisticsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No position data available</td></tr>';
+                        }
+                    }
+                    
+                    // Reinitialize the dropdown after data is loaded to ensure it's working
+                    initializeDropdown();
+                })
+                .catch(error => {
+                    console.error('Error loading analytics data:', error);
+                    // Error handling...
+                });
+        }
+        
+        // Handler for year filter change
+        // Year filter functionality removed as requested
+        
         document.addEventListener('DOMContentLoaded', function () {
             console.log('DOM loaded, checking if we are on analytics page:', window.location.pathname);
-
+            
             // Initialize the dropdown immediately
             initializeDropdown();
-
+            
             if (window.location.pathname === '/analytics') {
                 console.log('Fetching analytics data...');
-                fetchAnalyticsData();
+                // Fetch analytics data without year filter
+                setTimeout(function() {
+                    fetchAnalyticsData();
+                }, 100);
             }
         });
 
@@ -509,11 +627,12 @@
 
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                if (cells.length >= 4) {
-                    accepted.push(parseInt(cells[0].textContent) || 0);
-                    rejected.push(parseInt(cells[1].textContent) || 0);
-                    inNotice.push(parseInt(cells[2].textContent) || 0);
-                    joined.push(parseInt(cells[3].textContent) || 0);
+                if (cells.length >= 5) { // 5 columns: month, accepted, rejected, in_notice, joined
+                    months.push(cells[0].textContent);
+                    accepted.push(parseInt(cells[1].textContent) || 0);
+                    rejected.push(parseInt(cells[2].textContent) || 0);
+                    inNotice.push(parseInt(cells[3].textContent) || 0);
+                    joined.push(parseInt(cells[4].textContent) || 0);
                 }
             });
 
@@ -634,107 +753,6 @@
                     }
                 }
             });
-        }
-
-        function fetchAnalyticsData() {
-            fetch('/api/analytics')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Analytics data received:', data);
-
-                    // Populate Overall Analytics List
-                    const overallList = document.getElementById('overallAnalyticsList');
-                    overallList.innerHTML = `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total Applicant
-                            <span class="badge bg-primary rounded-pill">${data.total_applicant}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total Rejected
-                            <span class="badge bg-danger rounded-pill">${data.total_rejected}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            No response
-                            <span class="badge bg-warning rounded-pill">${data.no_response}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Not Interviewed
-                            <span class="badge bg-secondary rounded-pill">${data.not_interviewed}</span>
-                        </li>
-                    `;
-
-                    // Populate Hiring Funnel List
-                    const funnelList = document.getElementById('hiringFunnelList');
-                    funnelList.innerHTML = `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total Round 2 Completed
-                            <span class="badge bg-primary rounded-pill">${data.total_round_2_completed}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Didn't Join
-                            <span class="badge bg-danger rounded-pill">${data.did_not_join}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            On Hold
-                            <span class="badge bg-warning rounded-pill">${data.on_hold}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Accepted waiting Reference
-                            <span class="badge bg-info rounded-pill">${data.accepted_waiting_reference}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total In Notice/Yet to join
-                            <span class="badge bg-secondary rounded-pill">${data.total_in_notice_yet_to_join}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total Joined
-                            <span class="badge bg-success rounded-pill">${data.total_joined}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Intern
-                            <span class="badge bg-dark rounded-pill">${data.intern}</span>
-                        </li>
-                    `;
-
-                    const monthlyStatisticsBody = document.getElementById('monthlyStatisticsBody');
-                    if (data.monthly_statistics && data.monthly_statistics.length > 0) {
-                        monthlyStatisticsBody.innerHTML = data.monthly_statistics.map(item => `
-                            <tr>
-                                <td>${item.month}</td>
-                                <td>${item.applicants}</td>
-                                <td>${item.accepted}</td>
-                                <td>${item.rejected}</td>
-                                <td>${item.in_notice}</td>
-                                <td>${item.joined}</td>
-                            </tr>
-                        `).join('');
-                    } else {
-                        monthlyStatisticsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No monthly data available</td></tr>';
-                    }
-
-                    // POSITION STATISTICS
-                    const positionStatisticsBody = document.getElementById('positionStatisticsBody');
-
-                    if (data.position_statistics && data.position_statistics.length > 0) {
-                        const tableHTML = data.position_statistics.map(item => `
-                            <tr style="background-color: white;">
-                                <td style="font-weight: 500; color: #1f2937;">${item.position || 'N/A'}</td>
-                                <td style="text-align: center; font-weight: 600; color: #5b5fef;">${item.applied || 0}</td>
-                                <td style="text-align: center; font-weight: 600; color: #10b981;">${item.joined || 0}</td>
-                            </tr>
-                        `).join('');
-                        positionStatisticsBody.innerHTML = tableHTML;
-                    } else {
-                        positionStatisticsBody.innerHTML = '<tr><td colspan="3" class="text-center" style="color: red; font-weight: bold;">⚠️ No position data available in Excel file</td></tr>';
-                    }
-
-                    // Reinitialize the dropdown after data is loaded to ensure it's working
-                    initializeDropdown();
-                })
-                .catch(error => {
-                    console.error('Error loading analytics data:', error);
-                    // Error handling...
-                });
         }
     </script>
 </body>

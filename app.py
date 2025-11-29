@@ -384,7 +384,7 @@ def admin_required(f):
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', is_admin=session.get('is_admin', False))
 
 @app.route('/api/data', methods=['GET'])
 @login_required
@@ -454,22 +454,51 @@ def delete_data(index):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/analytics')
-@login_required
+@admin_required
 def analytics():
-    return render_template('analytics.html')
+    return render_template('analytics.html', is_admin=True)
 
 @app.route('/api/analytics', methods=['GET'])
 @login_required
-def get_analytics():
+def get_analytics_data():
+    """Return analytics data for the dashboard"""
     try:
-        data = load_data()
+        # Get year parameter from query string
+        year_filter = request.args.get('year')
         
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM candidates')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Convert to list of dictionaries
+        columns = [description[0] for description in cursor.description]
+        data = [dict(zip(columns, row)) for row in rows]
+        
+        # Filter data by year if specified
+        if year_filter:
+            filtered_data = []
+            for item in data:
+                date_str = item.get('Date of Application')
+                if date_str:
+                    try:
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                        if str(date_obj.year) == year_filter:
+                            filtered_data.append(item)
+                    except ValueError:
+                        pass
+            data = filtered_data
+            print(f"Filtered data for year {year_filter}: {len(data)} records")
+        else:
+            print(f"No year filter applied, returning all {len(data)} records")
+        
+        # Calculate metrics
         total_applicant = len(data)
         total_rejected = sum(1 for item in data if item.get('Application Status') == 'Rejected')
         no_response = sum(1 for item in data if item.get('Application Status') == 'No Resp Call/Email')
-        not_interviewed = sum(1 for item in data if item.get('Interview Status') == 'Applied') # Assuming 'Applied' means not yet interviewed
-        
-        total_round_2_completed = sum(1 for item in data if item.get('Interview Status') == 'Tech Inter Comp') # Assuming Tech Inter Comp is Round 2
+        not_interviewed = sum(1 for item in data if item.get('Interview Status') == 'Not Interviewed')
+        total_round_2_completed = sum(1 for item in data if item.get('Round 2 Status') == 'Completed')
         did_not_join = sum(1 for item in data if item.get('Application Status') == 'Did Not Join')
         on_hold = sum(1 for item in data if item.get('Application Status') == 'On Hold')
         accepted_waiting_reference = sum(1 for item in data if item.get('Application Status') == 'Accepted')
@@ -645,13 +674,10 @@ def get_dropdown_options():
 
 # User Management Routes (Admin Only)
 @app.route('/users')
-@login_required
+@admin_required
 def users_page():
     """User management page (admin only)"""
-    if not is_admin():
-        return redirect(url_for('index'))
-    print(f"isAdmin status before rendering users.html: {is_admin()}")
-    return render_template('users.html', isAdmin=is_admin())
+    return render_template('users.html', isAdmin=True)
 
 @app.route('/api/users', methods=['GET'])
 @admin_required

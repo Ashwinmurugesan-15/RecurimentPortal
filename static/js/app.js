@@ -22,10 +22,12 @@ const FIELD_ORDER = [
     'Comments',
     'In Notice', 'Immediate Joiner', 'Offers in Hand', 'Offered CTC',
     'Location Preference', 'Certifications', 'Resume', 'LinkedIn Profile', 'Referred By', 'Interview Status', 'Application Status',
+    // General/legacy remarks
+    'Remarks',
     // Stage-specific remarks captured separately in forms/details
     'Initial Screening', 'Round 1 D and T', 'Round 1 Remarks', 'Round 2 D and T', 'Round 2 Remarks', 'Final Remarks',
-    // General/legacy remarks
-    'Remarks', 'Reject Mail Sent'
+    // Other
+    'Reject Mail Sent'
 ];
 
 // Predefined dropdown options
@@ -72,7 +74,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // Then load data
         fetchData();
     });
-
+    
+    // Log that DOM is loaded and check for elements
+    console.log('DOM Content Loaded');
+    const monthlyStatsBody = document.getElementById('monthlyStatsBody');
+    const monthlyStatsTotals = document.getElementById('monthlyStatsTotals');
+    console.log('monthlyStatsBody element:', monthlyStatsBody);
+    console.log('monthlyStatsTotals element:', monthlyStatsTotals);
+    
     // Set up event listeners
     const saveBtn = document.getElementById('saveDataBtn');
     const updateBtn = document.getElementById('updateDataBtn');
@@ -136,10 +145,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Summary removed: skip fetchSummary()
                 // Update all analytics charts when switching to analytics tab
                 if (tableData && tableData.length > 0) {
+                    console.log('Updating monthly stats from tab switch');
                     updateMonthlyStats(tableData);
                     updateApplicationStatusChart(tableData);
                     // updatePositionChart(tableData); // Removed
-
+                    
                     // Trigger view update based on current dropdown selection
                     const viewType = document.getElementById('viewType').value;
                     toggleView(viewType);
@@ -159,9 +169,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function toggleFilterVisibility() {
         const filterContainer = document.getElementById('filterContainer');
         if (filterContainer) {
-            if (filterContainer.style.display === 'none' || filterContainer.style.display === '') {
-                filterContainer.style.display = 'flex'; // Or 'block' depending on original display
+            // Check if it's currently hidden
+            const isHidden = filterContainer.style.display === 'none' || 
+                             filterContainer.style.display === '' ||
+                             window.getComputedStyle(filterContainer).display === 'none';
+            
+            if (isHidden) {
+                // Show the filter container with flex display for row layout
+                filterContainer.style.display = 'flex';
             } else {
+                // Remove the year filter event listener
+                // Hide the filter container
                 filterContainer.style.display = 'none';
             }
         }
@@ -180,9 +198,8 @@ function toggleView(viewType) {
         // Re-render charts if data is available
         if (tableData && tableData.length > 0) {
             // Ensure charts are rendered properly (resize/update)
-            updateKeyMetrics(calculateTotals(tableData), tableData);
+            console.log('Updating monthly stats from toggleView chart view');
             updateMonthlyStats(tableData);
-            updatePositionStats(tableData);
             updateApplicationStatusChart(tableData);
         }
     } else {
@@ -204,8 +221,7 @@ function calculateTotals(data) {
         accepted: 0,
         rejected: 0,
         inNotice: 0,
-        joined: 0,
-        feedbackGiven: 0
+        joined: 0
     };
 
     data.forEach(candidate => {
@@ -216,7 +232,7 @@ function calculateTotals(data) {
             case 'Joined': totals.joined++; break;
         }
         if (candidate['Reference Feedback']) {
-            totals.feedbackGiven++;
+            // We're not tracking feedbackGiven in totals anymore since it's not displayed
         }
     });
     return totals;
@@ -324,7 +340,9 @@ function updateDistributionChart() {
     });
 }
 
-
+// Global variables to track the current candidate being edited in Round 1 Remarks modal
+let currentRound1CandidateIndex = null;
+let currentRound1RemarksData = null;
 
 function showRound1RemarksModal(candidate, index) {
     const modal = new bootstrap.Modal(document.getElementById('round1RemarksModal'));
@@ -387,6 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Overall Potential': document.getElementById('r1OverallPotential').value,
                 'Recommendation': document.getElementById('r1Recommendation').value,
             };
+            console.log('saveRound1Remarks: updatedRemarks', updatedRemarks);
 
             // Update the main tableData array
             tableData[candidateIndex]['Round 1 Remarks'] = JSON.stringify(updatedRemarks); // Store as JSON string
@@ -399,6 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ 'Round 1 Remarks': JSON.stringify(updatedRemarks) }),
                 });
+                console.log('saveRound1Remarks: fetch body', JSON.stringify({ 'Round 1 Remarks': JSON.stringify(updatedRemarks) }));
                 const result = await response.json();
                 if (result.status === 'success') {
                     showToast('Round 1 Remarks updated successfully!', 'success');
@@ -431,6 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Recommendation': document.getElementById('r2Recommendation').value,
                 'CTC': document.getElementById('r2CTC').value,
             };
+            console.log('saveRound2Remarks: updatedRemarks', updatedRemarks);
 
             // Update the main tableData array
             tableData[candidateIndex]['Round 2 Remarks'] = JSON.stringify(updatedRemarks); // Store as JSON string
@@ -443,6 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ 'Round 2 Remarks': JSON.stringify(updatedRemarks) }),
                 });
+                console.log('saveRound2Remarks: fetch body', JSON.stringify({ 'Round 2 Remarks': JSON.stringify(updatedRemarks) }));
                 const result = await response.json();
                 if (result.status === 'success') {
                     showToast('Round 2 Remarks updated successfully!', 'success');
@@ -843,11 +865,18 @@ function updateStickyColumnPositions() {
 
 // Function to populate the data table
 function populateTable(data, isAdmin) {
+    console.log('populateTable called with data:', data);
     tableData = data;
     currentIsAdmin = isAdmin; // Store admin status
 
     const tableBody = document.getElementById('dataTableBody');
     const tableHead = document.getElementById('dataTableHead');
+    
+    // Also update analytics when table data is populated
+    if (data && data.length > 0) {
+        console.log('Calling updateMonthlyStats from populateTable');
+        updateMonthlyStats(data);
+    }
 
     if (!tableBody || !tableHead) {
         console.error('Table elements not found in the DOM');
@@ -917,8 +946,8 @@ function populateTable(data, isAdmin) {
 
             // Add click event to show candidate details
             tr.addEventListener('click', (e) => {
-                // Don't trigger if clicking on action buttons or dropdowns
-                if (!e.target.closest('button') && !e.target.closest('select')) {
+                // Don't trigger if clicking on action buttons, dropdowns, or links
+                if (!e.target.closest('button') && !e.target.closest('select') && !e.target.closest('a')) {
                     const recordIndex = getRecordIndex(row);
                     showCandidateDetails(row, recordIndex, isAdmin);
                 }
@@ -961,36 +990,58 @@ function populateTable(data, isAdmin) {
                         td.textContent = row[column] || '';
                     }
                 } else if (column === 'Round 1 Remarks') {
-                    const remarksText = row[column] || 'Add Remarks';
-                    const button = document.createElement('button');
-                    button.className = 'btn btn-sm';
-                    button.textContent = 'click here to fill feedback';
-                    button.onclick = () => showRound1RemarksModal(row, index);
-                    td.appendChild(button);
-                    td.style.minWidth = '400px'; // Expanded width
-                    td.style.maxWidth = '400px'; // Expanded width
-                    td.style.overflow = 'hidden';
-                    td.style.textOverflow = 'ellipsis';
-                    td.style.whiteSpace = 'nowrap';
-                    td.title = row['Round 1 Remarks'] || ''; // Show full text on hover
-                } else if (column === 'Round 2 Remarks') {
-                    const remarksText = row[column] || 'Add Remarks';
-                    const button = document.createElement('button');
-                    button.className = 'btn btn-sm';
-                    button.textContent = 'click here to fill feedback';
-                    if (isAdmin) { // Only allow admin to click
-                        button.onclick = () => showRound2RemarksModal(row, index);
-                    } else {
-                        button.disabled = true; // Disable for non-admin
-                        button.title = 'Only administrators can edit Round 2 Remarks'; // Add tooltip
+                    let displayContent = 'click here to fill feedback';
+                    let r1Recommendation = '';
+                    try {
+                        const remarks = JSON.parse(row[column] || '{}');
+                        r1Recommendation = remarks['Recommendation'] || '';
+                        if (r1Recommendation) {
+                            displayContent = r1Recommendation;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing Round 1 Remarks JSON:", e);
                     }
-                    td.appendChild(button);
-                    td.style.minWidth = '400px'; // Expanded width
-                    td.style.maxWidth = '400px'; // Expanded width
+
+                    const span = document.createElement('span');
+                    span.textContent = displayContent;
+                    span.style.cursor = 'pointer';
+                    span.onclick = (event) => { event.stopPropagation(); showRound1RemarksModal(row, index); };
+                    td.appendChild(span);
+                    td.style.minWidth = '250px'; // Shortened width
+                    td.style.maxWidth = '250px'; // Shortened width
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
-                    td.title = row['Round 2 Remarks'] || ''; // Show full text on hover
+                    td.title = r1Recommendation || row[column] || ''; // Show full text on hover
+                } else if (column === 'Round 2 Remarks') {
+                    let displayContent = 'click here to fill feedback';
+                    let r2Recommendation = '';
+                    try {
+                        const remarks = JSON.parse(row[column] || '{}');
+                        r2Recommendation = remarks['Recommendation'] || '';
+                        if (r2Recommendation) {
+                            displayContent = r2Recommendation;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing Round 2 Remarks JSON:", e);
+                    }
+
+                    const span = document.createElement('span');
+                    span.textContent = displayContent;
+                    span.style.cursor = 'pointer';
+                    if (isAdmin) { // Only allow admin to click
+                        span.onclick = (event) => { event.stopPropagation(); showRound2RemarksModal(row, index); };
+                    } else {
+                        span.style.cursor = 'not-allowed';
+                        span.title = 'Only administrators can edit Round 2 Remarks'; // Add tooltip
+                    }
+                    td.appendChild(span);
+                    td.style.minWidth = '250px'; // Shortened width
+                    td.style.maxWidth = '250px'; // Shortened width
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
+                    td.title = r2Recommendation || row[column] || ''; // Show full text on hover
                 } else if (column === 'Interview Status' || column === 'Application Status' || column === 'Reject Mail Sent') {
                     td.dataset.column = column;
                     const currentStatus = row[column] || '';
@@ -1118,16 +1169,26 @@ function populateTable(data, isAdmin) {
                     }
                 } else if (column === 'Initial Screening') {
                     // Display Initial Screening column as separate column
-                    td.textContent = row['Initial Screening'] || row['Initial Remarks'] || '';
+                    const initialValue = row['Initial Screening'] || row['Initial Remarks'] || '';
+                    td.textContent = initialValue;
                     td.style.maxWidth = '200px';
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
-                    td.title = row['Initial Screening'] || row['Initial Remarks'] || ''; // Show full text on hover
+                    td.style.cursor = 'pointer';
+                    td.title = 'Click to view/edit initial screening';
+                    // Add data attribute to easily find this cell later
+                    const recordIndex = getRecordIndex(row);
+                    td.setAttribute('data-initial-screening-index', recordIndex);
+                    // Add click event to show initial screening in popup
+                    td.onclick = (event) => {
+                        event.stopPropagation();
+                        showInitialScreeningDetail(initialValue, recordIndex);
+                    };
                 } else if (column === 'Round 1 Remarks') {
                     // Display Round 1 Remarks column as separate column
                     td.textContent = row['Round 1 Remarks'] || '';
-                    td.style.maxWidth = '200px';
+                    td.style.maxWidth = '150px';
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
@@ -1135,28 +1196,48 @@ function populateTable(data, isAdmin) {
                 } else if (column === 'Round 2 Remarks') {
                     // Display Round 2 Remarks column as separate column
                     td.textContent = row['Round 2 Remarks'] || '';
-                    td.style.maxWidth = '200px';
+                    td.style.maxWidth = '150px';
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
                     td.title = row['Round 2 Remarks'] || ''; // Show full text on hover
                 } else if (column === 'Remarks') {
                     // General remarks column - show only general remarks (not the three screening remarks)
-                    td.textContent = row['Remarks'] || '';
+                    const remarksValue = row['Remarks'] || '';
+                    td.textContent = remarksValue;
                     td.style.maxWidth = '200px';
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
-                    td.title = row['Remarks'] || ''; // Show full text on hover
+                    td.style.cursor = 'pointer';
+                    td.title = 'Click to view/edit remarks';
+                    // Add data attribute to easily find this cell later
+                    const recordIndex = getRecordIndex(row);
+                    td.setAttribute('data-candidate-index', recordIndex);
+                    // Add click event to show remarks in popup
+                    td.onclick = (event) => {
+                        event.stopPropagation();
+                        showRemarksDetail(remarksValue, recordIndex);
+                    };
                 } else if (column === 'Final Remarks') {
                     // Final Remarks column - expanded width
-                    td.textContent = row['Final Remarks'] || '';
+                    const finalRemarksValue = row['Final Remarks'] || '';
+                    td.textContent = finalRemarksValue;
                     td.style.minWidth = '300px';
                     td.style.maxWidth = '400px';
                     td.style.overflow = 'hidden';
                     td.style.textOverflow = 'ellipsis';
                     td.style.whiteSpace = 'nowrap';
-                    td.title = row['Final Remarks'] || ''; // Show full text on hover
+                    td.style.cursor = 'pointer';
+                    td.title = 'Click to view/edit final remarks';
+                    // Add data attribute to easily find this cell later
+                    const recordIndex = getRecordIndex(row);
+                    td.setAttribute('data-final-remarks-index', recordIndex);
+                    // Add click event to show final remarks in popup
+                    td.onclick = (event) => {
+                        event.stopPropagation();
+                        showFinalRemarksDetail(finalRemarksValue, recordIndex);
+                    };
                 } else {
                     td.textContent = row[column] || '';
                 }
@@ -1544,6 +1625,164 @@ function openEditModal(index, isAdmin) {
     modal.show();
 }
 
+// Function to show final remarks detail in popup modal
+function showFinalRemarksDetail(finalValue, candidateIndex) {
+    const textArea = document.getElementById('finalRemarksTextArea');
+    const saveBtn = document.getElementById('saveFinalRemarks');
+    
+    if (textArea && saveBtn) {
+        // Set the initial value in the text area
+        textArea.value = finalValue || '';
+        
+        // Store the current candidate index
+        textArea.setAttribute('data-candidate-index', candidateIndex);
+        
+        // Add event listener for save button
+        saveBtn.onclick = saveFinalRemarksFromModal;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('finalRemarksModal'));
+        modal.show();
+    }
+}
+
+// Function to save final remarks from the modal
+function saveFinalRemarksFromModal() {
+    const textArea = document.getElementById('finalRemarksTextArea');
+    const newValue = textArea ? textArea.value : '';
+    const candidateIndex = textArea ? textArea.getAttribute('data-candidate-index') : null;
+    
+    if (candidateIndex === null) return;
+    
+    const updatedData = { 'Final Remarks': newValue };
+    
+    fetch(`/api/data/${candidateIndex}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Final Remarks updated successfully!', 'success');
+            // Update the table data
+            if (tableData[candidateIndex]) {
+                tableData[candidateIndex]['Final Remarks'] = newValue;
+            }
+            // Also update original data
+            if (originalTableData[candidateIndex]) {
+                originalTableData[candidateIndex]['Final Remarks'] = newValue;
+            }
+            
+            // Update the table cell directly
+            updateFinalRemarksTableCell(candidateIndex, newValue);
+            
+            // Close the modal
+            const modalElement = document.getElementById('finalRemarksModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+        } else {
+            showToast(`Error updating final remarks: ${data.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving final remarks:', error);
+        showToast('Error saving final remarks.', 'danger');
+    });
+}
+
+// Function to update the Final Remarks table cell directly
+function updateFinalRemarksTableCell(candidateIndex, newValue) {
+    // Find the Final Remarks cell using the data attribute
+    const remarksCell = document.querySelector(`td[data-final-remarks-index="${candidateIndex}"]`);
+    if (remarksCell) {
+        remarksCell.textContent = newValue || '';
+    }
+}
+
+// Function to show initial screening detail in popup modal
+function showInitialScreeningDetail(initialValue, candidateIndex) {
+    const textArea = document.getElementById('initialScreeningTextArea');
+    const saveBtn = document.getElementById('saveInitialScreening');
+    
+    if (textArea && saveBtn) {
+        // Set the initial value in the text area
+        textArea.value = initialValue || '';
+        
+        // Store the current candidate index
+        textArea.setAttribute('data-candidate-index', candidateIndex);
+        
+        // Add event listener for save button
+        saveBtn.onclick = saveInitialScreeningFromModal;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('initialScreeningModal'));
+        modal.show();
+    }
+}
+
+// Function to save initial screening from the modal
+function saveInitialScreeningFromModal() {
+    const textArea = document.getElementById('initialScreeningTextArea');
+    const newValue = textArea ? textArea.value : '';
+    const candidateIndex = textArea ? textArea.getAttribute('data-candidate-index') : null;
+    
+    if (candidateIndex === null) return;
+    
+    const updatedData = { 'Initial Screening': newValue };
+    
+    fetch(`/api/data/${candidateIndex}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Initial Screening updated successfully!', 'success');
+            // Update the table data
+            if (tableData[candidateIndex]) {
+                tableData[candidateIndex]['Initial Screening'] = newValue;
+            }
+            // Also update original data
+            if (originalTableData[candidateIndex]) {
+                originalTableData[candidateIndex]['Initial Screening'] = newValue;
+            }
+            
+            // Update the table cell directly
+            updateInitialScreeningTableCell(candidateIndex, newValue);
+            
+            // Close the modal
+            const modalElement = document.getElementById('initialScreeningModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+        } else {
+            showToast(`Error updating initial screening: ${data.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving initial screening:', error);
+        showToast('Error saving initial screening.', 'danger');
+    });
+}
+
+// Function to update the Initial Screening table cell directly
+function updateInitialScreeningTableCell(candidateIndex, newValue) {
+    // Find the Initial Screening cell using the data attribute
+    const screeningCell = document.querySelector(`td[data-initial-screening-index="${candidateIndex}"]`);
+    if (screeningCell) {
+        screeningCell.textContent = newValue || '';
+    }
+}
+
 // Function to save new record
 function saveNewRecord() {
     const formData = new FormData(document.getElementById('addDataForm'));
@@ -1862,27 +2101,105 @@ function updateGroupChart(data, groupColumn) {
     });
 }
 
+// Year filter functionality removed as requested
+
 // Analytics Functions
 function updateMonthlyStats(data) {
-    const monthlyStats = {};
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    // Initialize monthly stats
-    data.forEach(candidate => {
-        let dateStr = candidate['Date'] || candidate['Timestamp'] || '';
-        if (!dateStr) return;
-
-        // Parse date - handle different formats
-        let date;
-        if (dateStr.includes(' ')) {
-            dateStr = dateStr.split(' ')[0]; // Take only date part
+    console.log('=== updateMonthlyStats FUNCTION EXECUTED ===');
+    console.log('updateMonthlyStats called with data:', data);
+    console.log('Data length:', data.length);
+    if (data.length > 0) {
+        console.log('First record:', data[0]);
+        console.log('Date of Application field:', data[0]['Date of Application']);
+        console.log('All field names:', Object.keys(data[0]));
+        
+        // Check for alternative date field names
+        const possibleDateFields = ['Date', 'Date of Application', 'Timestamp', 'Application Date'];
+        for (const field of possibleDateFields) {
+            if (data[0][field] !== undefined) {
+                console.log(`Found date field '${field}':`, data[0][field]);
+            }
         }
-        date = new Date(dateStr);
-
-        if (isNaN(date.getTime())) return;
-
+    }
+    
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const monthlyStats = {};
+    
+    let validRecords = 0;
+    let invalidDateRecords = 0;
+    
+    data.forEach((candidate, index) => {
+        // Try different possible date field names
+        let dateStr = candidate['Date of Application'];
+        if (!dateStr) {
+            // Try alternative field names
+            const possibleDateFields = ['Date', 'Timestamp', 'Application Date'];
+            for (const field of possibleDateFields) {
+                if (candidate[field]) {
+                    dateStr = candidate[field];
+                    console.log(`Using alternative date field '${field}':`, dateStr);
+                    break;
+                }
+            }
+        }
+        
+        if (!dateStr) {
+            console.log('No date field found for candidate at index', index, ':', candidate);
+            invalidDateRecords++;
+            return;
+        }
+        
+        console.log('Processing date for candidate at index', index, ':', dateStr);
+        
+        // Parse date - handle different formats
+        let processedDateStr = dateStr;
+        console.log('Original date string:', dateStr);
+        
+        // Handle various date formats
+        if (dateStr.includes(' ')) {
+            processedDateStr = dateStr.split(' ')[0]; // Take only date part
+        }
+        
+        // Try different date parsing approaches
+        let date = new Date(processedDateStr);
+        
+        // If that fails, try other formats
+        if (isNaN(date.getTime())) {
+            // Try parsing as MM/DD/YYYY format
+            const parts = processedDateStr.split('/');
+            if (parts.length === 3) {
+                date = new Date(parts[2], parts[0] - 1, parts[1]); // YYYY, MM, DD
+            }
+        }
+        
+        if (isNaN(date.getTime())) {
+            // Try parsing as DD/MM/YYYY format
+            const parts = processedDateStr.split('/');
+            if (parts.length === 3) {
+                date = new Date(parts[2], parts[1] - 1, parts[0]); // YYYY, MM, DD
+            }
+        }
+        
+        if (isNaN(date.getTime())) {
+            // Try parsing as YYYY-MM-DD format
+            const parts = processedDateStr.split('-');
+            if (parts.length === 3) {
+                date = new Date(parts[0], parts[1] - 1, parts[2]); // YYYY, MM, DD
+            }
+        }
+        
+        if (isNaN(date.getTime())) {
+            console.log('Unable to parse date for candidate at index', index, ':', dateStr);
+            invalidDateRecords++;
+            return;
+        }
+        
+        validRecords++;
         const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-
+        console.log('Valid date processed for candidate at index', index, ':', date, '->', monthKey);
+        
         if (!monthlyStats[monthKey]) {
             monthlyStats[monthKey] = {
                 applicants: 0,
@@ -1893,9 +2210,9 @@ function updateMonthlyStats(data) {
                 feedbackGiven: 0
             };
         }
-
+        
         monthlyStats[monthKey].applicants++;
-
+        
         switch (candidate['Application Status']) {
             case 'Accepted':
                 monthlyStats[monthKey].accepted++;
@@ -1910,76 +2227,97 @@ function updateMonthlyStats(data) {
                 monthlyStats[monthKey].joined++;
                 break;
         }
-
+        
         if (candidate['Reference Feedback']) {
             monthlyStats[monthKey].feedbackGiven++;
         }
     });
-
+    
+    console.log('Valid records:', validRecords, 'Invalid date records:', invalidDateRecords);
+    console.log('Monthly stats:', monthlyStats);
+    
     // Sort months chronologically
     const sortedMonths = Object.keys(monthlyStats).sort((a, b) => {
         const [monthA, yearA] = a.split(' ');
         const [monthB, yearB] = b.split(' ');
         return new Date(`${monthA} 1, ${yearA}`) - new Date(`${monthB} 1, ${yearB}`);
     });
-
+    
+    console.log('Sorted months:', sortedMonths);
+    
     // Update table
     const tbody = document.getElementById('monthlyStatsBody');
     const tfoot = document.getElementById('monthlyStatsTotals');
+    
+    console.log('Looking for monthlyStatsBody element:', tbody);
+    console.log('Looking for monthlyStatsTotals element:', tfoot);
+    
+    if (!tbody || !tfoot) {
+        console.error('Monthly stats table elements not found');
+        // Try to find them in another way
+        const allElements = document.querySelectorAll('*');
+        console.log('All elements with IDs containing "monthly":');
+        allElements.forEach(el => {
+            if (el.id && el.id.toLowerCase().includes('monthly')) {
+                console.log('Found element:', el.id, el);
+            }
+        });
+        return;
+    }
+    
     tbody.innerHTML = '';
-
+    
     const totals = {
         applicants: 0,
         accepted: 0,
         rejected: 0,
         inNotice: 0,
-        joined: 0,
-        feedbackGiven: 0
+        joined: 0
     };
-
+    
     const labels = [];
     const acceptedData = [];
     const rejectedData = [];
     const joinedData = [];
-
+    
     sortedMonths.forEach(month => {
         const stats = monthlyStats[month];
-
+        
         // Prepare chart data
         labels.push(month);
         acceptedData.push(stats.accepted);
         rejectedData.push(stats.rejected);
         joinedData.push(stats.joined);
-
+        
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${month}</td>
+            <td class="text-center">${stats.applicants}</td>
             <td class="text-center">${stats.accepted}</td>
             <td class="text-center">${stats.rejected}</td>
             <td class="text-center">${stats.inNotice}</td>
             <td class="text-center">${stats.joined}</td>
-            <td class="text-center">${stats.feedbackGiven}</td>
         `;
         tbody.appendChild(row);
-
+        
         // Update totals
         Object.keys(totals).forEach(key => {
             totals[key] += stats[key];
         });
     });
-
+    
     // Add totals row
     tfoot.innerHTML = `
         <tr class="table-success fw-bold">
             <td>Total</td>
+            <td class="text-center">${totals.applicants}</td>
             <td class="text-center">${totals.accepted}</td>
             <td class="text-center">${totals.rejected}</td>
             <td class="text-center">${totals.inNotice}</td>
             <td class="text-center">${totals.joined}</td>
-            <td class="text-center">${totals.feedbackGiven}</td>
         </tr>
     `;
-
+    
     // Render Monthly Stats Chart
     const monthlyCtx = document.getElementById('monthlyStatsChart');
     if (monthlyCtx && document.getElementById('viewType').value === 'chart') {
@@ -1999,15 +2337,15 @@ function updateMonthlyStats(data) {
             options: { responsive: true, maintainAspectRatio: false }
         });
     }
-
+    
     // Update key metrics
     updateKeyMetrics(totals, data);
-
+    
     // Update position statistics
     updatePositionStats(data);
 }
 
-// Update Position Statistics Table
+    // Update Position Statistics Table
 function updatePositionStats(data) {
     const positionStats = {};
 
@@ -2195,6 +2533,12 @@ function updateKeyMetrics(totals, data) {
         // Chart View: Render Metrics Chart
         const metricsCtx = document.getElementById('metricsChart');
         if (metricsCtx && document.getElementById('viewType').value === 'chart') {
+            // Check if Chart.js is available
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js is not loaded, skipping metrics chart rendering');
+                return;
+            }
+            
             if (window.metricsChartInstance) {
                 window.metricsChartInstance.destroy();
             }
@@ -2266,6 +2610,12 @@ function updateApplicationStatusChart(data) {
     // Render Chart if in Chart View
     const ctx = document.getElementById('applicationStatusChart');
     if (ctx && document.getElementById('viewType').value === 'chart') {
+        // Check if Chart.js is available
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js is not loaded, skipping application status chart rendering');
+            return;
+        }
+        
         if (window.applicationStatusChartInstance) {
             window.applicationStatusChartInstance.destroy();
         }
@@ -2332,8 +2682,21 @@ function updateReferenceFeedbackChart(data) {
         }
     });
 
-    const ctx = document.getElementById('referenceFeedbackChart').getContext('2d');
-    new Chart(ctx, {
+    const ctx = document.getElementById('referenceFeedbackChart');
+    if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping reference feedback chart rendering');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (window.referenceFeedbackChartInstance) {
+        window.referenceFeedbackChartInstance.destroy();
+    }
+
+    window.referenceFeedbackChartInstance = new Chart(ctx.getContext('2d'), {
         type: 'bar',
         data: {
             labels: Object.keys(feedbackCounts),
@@ -2378,8 +2741,21 @@ function updateOverallDistributionChart(data) {
         months[monthKey]++;
     });
 
-    const ctx = document.getElementById('overallDistributionChart').getContext('2d');
-    new Chart(ctx, {
+    const ctx = document.getElementById('overallDistributionChart');
+    if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping overall distribution chart rendering');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (window.overallDistributionChartInstance) {
+        window.overallDistributionChartInstance.destroy();
+    }
+
+    window.overallDistributionChartInstance = new Chart(ctx.getContext('2d'), {
         type: 'doughnut',
         data: {
             labels: Object.keys(months),
@@ -2421,7 +2797,6 @@ let referralSourceChart = null;
 let noticePeriodChart = null;
 let monthlyTrendsChart = null;
 
-
 // Interview Status Pie Chart
 function updateInterviewStatusChart(data) {
     const statusCounts = {};
@@ -2433,6 +2808,12 @@ function updateInterviewStatusChart(data) {
 
     const ctx = document.getElementById('interviewStatusChart');
     if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping interview status chart rendering');
+        return;
+    }
 
     if (interviewStatusChart) {
         interviewStatusChart.destroy();
@@ -2461,6 +2842,7 @@ function updateInterviewStatusChart(data) {
         }
     });
 }
+     
 
 // Experience Level Chart
 function updateExperienceChart(data) {
@@ -2473,6 +2855,12 @@ function updateExperienceChart(data) {
 
     const ctx = document.getElementById('experienceChart');
     if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping experience chart rendering');
+        return;
+    }
 
     if (experienceChart) {
         experienceChart.destroy();
@@ -2510,6 +2898,8 @@ function updateExperienceChart(data) {
     });
 }
 
+                
+
 // Referral Source Chart
 function updateReferralSourceChart(data) {
     const referralCounts = {};
@@ -2521,6 +2911,12 @@ function updateReferralSourceChart(data) {
 
     const ctx = document.getElementById('referralSourceChart');
     if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping referral source chart rendering');
+        return;
+    }
 
     if (referralSourceChart) {
         referralSourceChart.destroy();
@@ -2561,6 +2957,12 @@ function updateNoticePeriodChart(data) {
 
     const ctx = document.getElementById('noticePeriodChart');
     if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping notice period chart rendering');
+        return;
+    }
 
     if (noticePeriodChart) {
         noticePeriodChart.destroy();
@@ -2621,28 +3023,34 @@ function updateMonthlyTrendsChart(data) {
             monthlyData[monthKey] = {
                 total: 0,
                 accepted: 0,
-                rejected: 0,
-                joined: 0
+                rejected: 0
             };
         }
 
         monthlyData[monthKey].total++;
-
-        const appStatus = candidate['Application Status'] || '';
-        if (appStatus === 'Accepted') monthlyData[monthKey].accepted++;
-        if (appStatus === 'Rejected') monthlyData[monthKey].rejected++;
-        if (appStatus === 'Joined') monthlyData[monthKey].joined++;
+        const status = candidate['Application Status'];
+        if (status === 'Accepted') {
+            monthlyData[monthKey].accepted++;
+        } else if (status === 'Rejected') {
+            monthlyData[monthKey].rejected++;
+        }
     });
 
     // Sort months chronologically
     const sortedMonths = Object.keys(monthlyData).sort((a, b) => {
-        const [monthA, yearA] = a.split(' ');
-        const [monthB, yearB] = b.split(' ');
-        return new Date(`${monthA} 1, ${yearA}`) - new Date(`${monthB} 1, ${yearB}`);
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        return dateA - dateB;
     });
 
     const ctx = document.getElementById('monthlyTrendsChart');
     if (!ctx) return;
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded, skipping monthly trends chart rendering');
+        return;
+    }
 
     if (monthlyTrendsChart) {
         monthlyTrendsChart.destroy();
@@ -2655,34 +3063,23 @@ function updateMonthlyTrendsChart(data) {
             datasets: [
                 {
                     label: 'Total Applications',
-                    data: sortedMonths.map(m => monthlyData[m].total),
-                    borderColor: 'rgba(79, 70, 229, 1)',
+                    data: sortedMonths.map(month => monthlyData[month].total),
+                    borderColor: '#4f46e5',
                     backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                    tension: 0.4,
                     fill: true
                 },
                 {
                     label: 'Accepted',
-                    data: sortedMonths.map(m => monthlyData[m].accepted),
-                    borderColor: 'rgba(16, 185, 129, 1)',
+                    data: sortedMonths.map(month => monthlyData[month].accepted),
+                    borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
                     fill: true
                 },
                 {
                     label: 'Rejected',
-                    data: sortedMonths.map(m => monthlyData[m].rejected),
-                    borderColor: 'rgba(239, 68, 68, 1)',
+                    data: sortedMonths.map(month => monthlyData[month].rejected),
+                    borderColor: '#ef4444',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'Joined',
-                    data: sortedMonths.map(m => monthlyData[m].joined),
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4,
                     fill: true
                 }
             ]
@@ -2737,6 +3134,7 @@ async function refreshData() {
 
         // Update analytics if on analytics tab
         if (document.getElementById('analysisTab') && document.getElementById('analysisTab').classList.contains('active')) {
+            console.log('Updating monthly stats from refreshData');
             updateMonthlyStats(data.data);
             updateApplicationStatusChart(data.data);
             // Update remaining analytics charts
@@ -2922,6 +3320,8 @@ function showCandidateDetails(candidate, index, isAdmin) {
     content.innerHTML = detailsHTML;
 
     // Add event listeners for inline editing
+    // Removed direct click and blur event listeners to prevent double-click editing issues
+    // Editing now only happens through the main Edit/Save buttons
     document.querySelectorAll('.candidate-detail-item').forEach(item => {
         const displaySpan = item.querySelector('.candidate-detail-value');
         const editInput = item.querySelector('.edit-mode');
@@ -2933,101 +3333,20 @@ function showCandidateDetails(candidate, index, isAdmin) {
         if (isStatusField) {
             const statusSelect = item.querySelector('select');
             if (statusSelect && isEditable) {
-                // Only allow changes if editable (admin users)
-                statusSelect.addEventListener('change', () => {
-                    const newValue = statusSelect.value;
-                    const candidateIndex = item.dataset.candidateIndex ?? index;
-
-                    const updatedCandidate = {};
-                    updatedCandidate[fieldName] = newValue;
-
-                    fetch(`/api/data/${candidateIndex}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(updatedCandidate),
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'success') {
-                                showToast('Candidate updated successfully!', 'success');
-                                refreshData();
-                            } else {
-                                showToast(`Error updating candidate: ${data.message}`, 'danger');
-                                // Revert dropdown value on error
-                                statusSelect.value = candidate[fieldName] || '';
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error saving candidate:', error);
-                            showToast('Error saving candidate.', 'danger');
-                            // Revert dropdown value on error
-                            statusSelect.value = candidate[fieldName] || '';
-                        });
-                });
+                // Status fields will be handled through the main edit/save buttons
+                // Remove any existing event listeners that might cause direct editing
             }
         } else {
-            // Handle other fields with click-to-edit functionality
-            // Allow inline editing only for editable fields
+            // Handle other fields - editing only through the main Edit/Save buttons
+            // All editing is now controlled by the main Edit/Save buttons only
+            // Removed the direct click listener that was triggering edit mode on any click
+            // Removed the editInput blur listener that was saving on blur
+            // Editing now only happens through the main Edit/Save buttons
             if (displaySpan && editInput && isEditable) {
-                displaySpan.addEventListener('click', (e) => {
-                    // Don't trigger edit if clicking on a link (Resume/LinkedIn)
-                    if (e.target.tagName === 'A' || e.target.closest('a')) {
-                        return;
-                    }
-
-                    displaySpan.style.display = 'none';
-                    editInput.style.display = 'block';
-                    editInput.removeAttribute('readonly');
-                    editInput.removeAttribute('disabled');
-                    editInput.focus();
-                });
-
-                editInput.addEventListener('blur', () => {
-                    const newValue = editInput.value;
-                    displaySpan.style.display = 'block';
-                    editInput.style.display = 'none';
-
-                    // Update display value based on field type
-                    if (fieldName === 'Resume' && newValue && newValue.toString().startsWith('http')) {
-                        displaySpan.innerHTML = `<a href="${newValue}" target="_blank" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-file-earmark-pdf me-1"></i>View Resume
-                        </a>`;
-                    } else if (fieldName === 'LinkedIn Profile' && newValue && newValue.toString().startsWith('http')) {
-                        displaySpan.innerHTML = `<a href="${newValue}" target="_blank" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-linkedin me-1"></i>View LinkedIn
-                        </a>`;
-                    } else {
-                        displaySpan.textContent = newValue;
-                    }
-
-                    // Save single-field update on blur
-                    const updatedCandidate = {};
-                    updatedCandidate[fieldName] = newValue;
-                    const candidateIndex = item.dataset.candidateIndex ?? index; // Retrieve candidate index
-
-                    fetch(`/api/data/${candidateIndex}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(updatedCandidate),
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'success') {
-                                showToast('Candidate updated successfully!', 'success');
-                                refreshData();
-                            } else {
-                                showToast(`Error updating candidate: ${data.message}`, 'danger');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error saving candidate:', error);
-                            showToast('Error saving candidate.', 'danger');
-                        });
-                });
+                // Event listeners removed:
+                // 1. displaySpan click listener that was triggering edit mode on any click
+                // 2. editInput blur listener that was saving on blur
+                // Editing now only happens through the main Edit/Save buttons
             }
         }
     });
@@ -3204,6 +3523,94 @@ function showCandidateDetails(candidate, index, isAdmin) {
     bsModal.show();
 }
 
+// Global variable to track the current candidate being edited in remarks modal
+let currentRemarksCandidateIndex = null;
+let currentRemarksValue = null;
+
+// Function to show remarks detail in popup modal
+function showRemarksDetail(remarks, candidateIndex) {
+    const modalContent = document.getElementById('remarksDetailContent');
+    const saveBtn = document.getElementById('saveRemarksInModal');
+    
+    if (modalContent && saveBtn) {
+        // Store the current candidate index and remarks value
+        currentRemarksCandidateIndex = candidateIndex;
+        currentRemarksValue = remarks;
+        
+        // Display the remarks text field directly for editing
+        modalContent.innerHTML = `
+            <div class="mb-3">
+                <label for="remarksTextArea" class="form-label">Remarks:</label>
+                <textarea class="form-control" id="remarksTextArea" rows="5">${remarks || ''}</textarea>
+            </div>
+        `;
+        
+        // Add event listener for save button
+        saveBtn.onclick = saveRemarksFromModal;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('remarksDetailModal'));
+        modal.show();
+    }
+}
+
+// Function to save remarks from the modal
+function saveRemarksFromModal() {
+    const remarksTextArea = document.getElementById('remarksTextArea');
+    const newRemarksValue = remarksTextArea ? remarksTextArea.value : '';
+    
+    if (currentRemarksCandidateIndex === null) return;
+    
+    const updatedData = { Remarks: newRemarksValue };
+    
+    fetch(`/api/data/${currentRemarksCandidateIndex}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Remarks updated successfully!', 'success');
+            // Update the table data
+            if (tableData[currentRemarksCandidateIndex]) {
+                tableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
+            }
+            // Also update original data
+            if (originalTableData[currentRemarksCandidateIndex]) {
+                originalTableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
+            }
+            
+            // Update the table cell directly
+            updateRemarksTableCell(currentRemarksCandidateIndex, newRemarksValue);
+            
+            // Close the modal
+            const modalElement = document.getElementById('remarksDetailModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+        } else {
+            showToast(`Error updating remarks: ${data.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving remarks:', error);
+        showToast('Error saving remarks.', 'danger');
+    });
+}
+
+// Function to update the Remarks table cell directly
+function updateRemarksTableCell(candidateIndex, newRemarksValue) {
+    // Find the Remarks cell using the data attribute
+    const remarksCell = document.querySelector(`td[data-candidate-index="${candidateIndex}"]`);
+    if (remarksCell) {
+        remarksCell.textContent = newRemarksValue || '';
+    }
+}
+
 // Helper function to show toast notifications
 function showToast(message, type) {
     const toastContainer = document.createElement('div');
@@ -3263,3 +3670,4 @@ function formatFieldValue(field, value) {
         return '—';
     }
 }
+            
