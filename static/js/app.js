@@ -697,7 +697,7 @@ function populateStatusFilterOptions() {
 
 // Fetch data from the API
 function fetchData() {
-    fetch('/api/data')
+    fetch('/api/data?t=' + new Date().getTime())
         .then(response => response.json())
         .then(responseData => {
             const { data, is_admin } = responseData;
@@ -3169,7 +3169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Update the existing refreshData function to include analytics updates
 async function refreshData() {
     try {
-        const response = await fetch('/api/data');
+        const response = await fetch('/api/data?t=' + new Date().getTime());
         const data = await response.json();
         console.log('Data refreshed:', data); // Add this line to log the refreshed data
 
