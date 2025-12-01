@@ -74,14 +74,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // Then load data
         fetchData();
     });
-    
+
     // Log that DOM is loaded and check for elements
     console.log('DOM Content Loaded');
     const monthlyStatsBody = document.getElementById('monthlyStatsBody');
     const monthlyStatsTotals = document.getElementById('monthlyStatsTotals');
     console.log('monthlyStatsBody element:', monthlyStatsBody);
     console.log('monthlyStatsTotals element:', monthlyStatsTotals);
-    
+
     // Set up event listeners
     const saveBtn = document.getElementById('saveDataBtn');
     const updateBtn = document.getElementById('updateDataBtn');
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     updateMonthlyStats(tableData);
                     updateApplicationStatusChart(tableData);
                     // updatePositionChart(tableData); // Removed
-                    
+
                     // Trigger view update based on current dropdown selection
                     const viewType = document.getElementById('viewType').value;
                     toggleView(viewType);
@@ -170,10 +170,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const filterContainer = document.getElementById('filterContainer');
         if (filterContainer) {
             // Check if it's currently hidden
-            const isHidden = filterContainer.style.display === 'none' || 
-                             filterContainer.style.display === '' ||
-                             window.getComputedStyle(filterContainer).display === 'none';
-            
+            const isHidden = filterContainer.style.display === 'none' ||
+                filterContainer.style.display === '' ||
+                window.getComputedStyle(filterContainer).display === 'none';
+
             if (isHidden) {
                 // Show the filter container with flex display for row layout
                 filterContainer.style.display = 'flex';
@@ -388,7 +388,7 @@ function showRound2RemarksModal(candidate, index) {
 }
 
 // Event listener for saving Round 1 Remarks
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const saveRound1RemarksBtn = document.getElementById('saveRound1Remarks');
     if (saveRound1RemarksBtn) {
         saveRound1RemarksBtn.addEventListener('click', async () => {
@@ -871,11 +871,12 @@ function populateTable(data, isAdmin) {
 
     const tableBody = document.getElementById('dataTableBody');
     const tableHead = document.getElementById('dataTableHead');
-    
+
     // Also update analytics when table data is populated
     if (data && data.length > 0) {
         console.log('Calling updateMonthlyStats from populateTable');
         updateMonthlyStats(data);
+        updateOfferDetails(data);
     }
 
     if (!tableBody || !tableHead) {
@@ -1147,6 +1148,63 @@ function populateTable(data, isAdmin) {
                                 select.classList.add('status-proceed');
                             } else if (newStatus === 'Rejected') {
                                 select.classList.add('status-rejected');
+
+                                // AUTOMATION: Send rejection email and update "Reject Mail Sent"
+                                const rejectMailCell = rowElement.querySelector('td[data-column="Reject Mail Sent"]');
+                                if (rejectMailCell) {
+                                    const rejectMailSelect = rejectMailCell.querySelector('select');
+                                    if (rejectMailSelect && rejectMailSelect.value !== 'Yes') {
+                                        // Get candidate details
+                                        const candidateName = row['Name'] || 'Candidate';
+                                        const candidateEmail = row['Email ID'];
+                                        const position = row['Interested Position'] || 'the position';
+
+                                        if (candidateEmail && candidateEmail.includes('@')) {
+                                            // Show sending notification
+                                            showNotification('Sending rejection email...', 'info');
+
+                                            // Send rejection email
+                                            fetch('/api/send-rejection-email', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    name: candidateName,
+                                                    email: candidateEmail,
+                                                    position: position
+                                                })
+                                            })
+                                                .then(response => response.json())
+                                                .then(emailData => {
+                                                    if (emailData.status === 'success') {
+                                                        // Update "Reject Mail Sent" to "Yes"
+                                                        rejectMailSelect.value = 'Yes';
+
+                                                        // Update the backend
+                                                        updateRecordStatus(recordIndex, 'Reject Mail Sent', 'Yes', rowElement, '', 'Reject Mail Sent');
+
+                                                        // Update local data
+                                                        row['Reject Mail Sent'] = 'Yes';
+
+                                                        // Show success notification
+                                                        showNotification('✅ Rejection email sent to ' + candidateName, 'success');
+                                                    } else {
+                                                        showNotification('⚠️ Failed to send rejection email: ' + emailData.message, 'error');
+                                                        console.error('Email sending failed:', emailData.message);
+                                                    }
+                                                })
+                                                .catch(error => {
+                                                    console.error('Error sending rejection email:', error);
+                                                    showNotification('❌ Error sending rejection email', 'error');
+                                                });
+                                        } else {
+                                            // No valid email address
+                                            showNotification('⚠️ No valid email address found for ' + candidateName, 'warning');
+                                            console.warn('Invalid or missing email for candidate:', row);
+                                        }
+                                    }
+                                }
                             } else if (newStatus === 'Accepted') {
                                 select.classList.add('status-accepted');
                             }
@@ -1629,17 +1687,17 @@ function openEditModal(index, isAdmin) {
 function showFinalRemarksDetail(finalValue, candidateIndex) {
     const textArea = document.getElementById('finalRemarksTextArea');
     const saveBtn = document.getElementById('saveFinalRemarks');
-    
+
     if (textArea && saveBtn) {
         // Set the initial value in the text area
         textArea.value = finalValue || '';
-        
+
         // Store the current candidate index
         textArea.setAttribute('data-candidate-index', candidateIndex);
-        
+
         // Add event listener for save button
         saveBtn.onclick = saveFinalRemarksFromModal;
-        
+
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('finalRemarksModal'));
         modal.show();
@@ -1651,11 +1709,11 @@ function saveFinalRemarksFromModal() {
     const textArea = document.getElementById('finalRemarksTextArea');
     const newValue = textArea ? textArea.value : '';
     const candidateIndex = textArea ? textArea.getAttribute('data-candidate-index') : null;
-    
+
     if (candidateIndex === null) return;
-    
+
     const updatedData = { 'Final Remarks': newValue };
-    
+
     fetch(`/api/data/${candidateIndex}`, {
         method: 'PUT',
         headers: {
@@ -1663,36 +1721,36 @@ function saveFinalRemarksFromModal() {
         },
         body: JSON.stringify(updatedData),
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showToast('Final Remarks updated successfully!', 'success');
-            // Update the table data
-            if (tableData[candidateIndex]) {
-                tableData[candidateIndex]['Final Remarks'] = newValue;
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Final Remarks updated successfully!', 'success');
+                // Update the table data
+                if (tableData[candidateIndex]) {
+                    tableData[candidateIndex]['Final Remarks'] = newValue;
+                }
+                // Also update original data
+                if (originalTableData[candidateIndex]) {
+                    originalTableData[candidateIndex]['Final Remarks'] = newValue;
+                }
+
+                // Update the table cell directly
+                updateFinalRemarksTableCell(candidateIndex, newValue);
+
+                // Close the modal
+                const modalElement = document.getElementById('finalRemarksModal');
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+            } else {
+                showToast(`Error updating final remarks: ${data.message}`, 'danger');
             }
-            // Also update original data
-            if (originalTableData[candidateIndex]) {
-                originalTableData[candidateIndex]['Final Remarks'] = newValue;
-            }
-            
-            // Update the table cell directly
-            updateFinalRemarksTableCell(candidateIndex, newValue);
-            
-            // Close the modal
-            const modalElement = document.getElementById('finalRemarksModal');
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) {
-                modal.hide();
-            }
-        } else {
-            showToast(`Error updating final remarks: ${data.message}`, 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving final remarks:', error);
-        showToast('Error saving final remarks.', 'danger');
-    });
+        })
+        .catch(error => {
+            console.error('Error saving final remarks:', error);
+            showToast('Error saving final remarks.', 'danger');
+        });
 }
 
 // Function to update the Final Remarks table cell directly
@@ -1708,17 +1766,17 @@ function updateFinalRemarksTableCell(candidateIndex, newValue) {
 function showInitialScreeningDetail(initialValue, candidateIndex) {
     const textArea = document.getElementById('initialScreeningTextArea');
     const saveBtn = document.getElementById('saveInitialScreening');
-    
+
     if (textArea && saveBtn) {
         // Set the initial value in the text area
         textArea.value = initialValue || '';
-        
+
         // Store the current candidate index
         textArea.setAttribute('data-candidate-index', candidateIndex);
-        
+
         // Add event listener for save button
         saveBtn.onclick = saveInitialScreeningFromModal;
-        
+
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('initialScreeningModal'));
         modal.show();
@@ -1730,11 +1788,11 @@ function saveInitialScreeningFromModal() {
     const textArea = document.getElementById('initialScreeningTextArea');
     const newValue = textArea ? textArea.value : '';
     const candidateIndex = textArea ? textArea.getAttribute('data-candidate-index') : null;
-    
+
     if (candidateIndex === null) return;
-    
+
     const updatedData = { 'Initial Screening': newValue };
-    
+
     fetch(`/api/data/${candidateIndex}`, {
         method: 'PUT',
         headers: {
@@ -1742,36 +1800,36 @@ function saveInitialScreeningFromModal() {
         },
         body: JSON.stringify(updatedData),
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showToast('Initial Screening updated successfully!', 'success');
-            // Update the table data
-            if (tableData[candidateIndex]) {
-                tableData[candidateIndex]['Initial Screening'] = newValue;
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Initial Screening updated successfully!', 'success');
+                // Update the table data
+                if (tableData[candidateIndex]) {
+                    tableData[candidateIndex]['Initial Screening'] = newValue;
+                }
+                // Also update original data
+                if (originalTableData[candidateIndex]) {
+                    originalTableData[candidateIndex]['Initial Screening'] = newValue;
+                }
+
+                // Update the table cell directly
+                updateInitialScreeningTableCell(candidateIndex, newValue);
+
+                // Close the modal
+                const modalElement = document.getElementById('initialScreeningModal');
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+            } else {
+                showToast(`Error updating initial screening: ${data.message}`, 'danger');
             }
-            // Also update original data
-            if (originalTableData[candidateIndex]) {
-                originalTableData[candidateIndex]['Initial Screening'] = newValue;
-            }
-            
-            // Update the table cell directly
-            updateInitialScreeningTableCell(candidateIndex, newValue);
-            
-            // Close the modal
-            const modalElement = document.getElementById('initialScreeningModal');
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) {
-                modal.hide();
-            }
-        } else {
-            showToast(`Error updating initial screening: ${data.message}`, 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving initial screening:', error);
-        showToast('Error saving initial screening.', 'danger');
-    });
+        })
+        .catch(error => {
+            console.error('Error saving initial screening:', error);
+            showToast('Error saving initial screening.', 'danger');
+        });
 }
 
 // Function to update the Initial Screening table cell directly
@@ -2112,7 +2170,7 @@ function updateMonthlyStats(data) {
         console.log('First record:', data[0]);
         console.log('Date of Application field:', data[0]['Date of Application']);
         console.log('All field names:', Object.keys(data[0]));
-        
+
         // Check for alternative date field names
         const possibleDateFields = ['Date', 'Date of Application', 'Timestamp', 'Application Date'];
         for (const field of possibleDateFields) {
@@ -2121,15 +2179,15 @@ function updateMonthlyStats(data) {
             }
         }
     }
-    
+
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
+
     const monthlyStats = {};
-    
+
     let validRecords = 0;
     let invalidDateRecords = 0;
-    
+
     data.forEach((candidate, index) => {
         // Try different possible date field names
         let dateStr = candidate['Date of Application'];
@@ -2144,27 +2202,27 @@ function updateMonthlyStats(data) {
                 }
             }
         }
-        
+
         if (!dateStr) {
             console.log('No date field found for candidate at index', index, ':', candidate);
             invalidDateRecords++;
             return;
         }
-        
+
         console.log('Processing date for candidate at index', index, ':', dateStr);
-        
+
         // Parse date - handle different formats
         let processedDateStr = dateStr;
         console.log('Original date string:', dateStr);
-        
+
         // Handle various date formats
         if (dateStr.includes(' ')) {
             processedDateStr = dateStr.split(' ')[0]; // Take only date part
         }
-        
+
         // Try different date parsing approaches
         let date = new Date(processedDateStr);
-        
+
         // If that fails, try other formats
         if (isNaN(date.getTime())) {
             // Try parsing as MM/DD/YYYY format
@@ -2173,7 +2231,7 @@ function updateMonthlyStats(data) {
                 date = new Date(parts[2], parts[0] - 1, parts[1]); // YYYY, MM, DD
             }
         }
-        
+
         if (isNaN(date.getTime())) {
             // Try parsing as DD/MM/YYYY format
             const parts = processedDateStr.split('/');
@@ -2181,7 +2239,7 @@ function updateMonthlyStats(data) {
                 date = new Date(parts[2], parts[1] - 1, parts[0]); // YYYY, MM, DD
             }
         }
-        
+
         if (isNaN(date.getTime())) {
             // Try parsing as YYYY-MM-DD format
             const parts = processedDateStr.split('-');
@@ -2189,17 +2247,17 @@ function updateMonthlyStats(data) {
                 date = new Date(parts[0], parts[1] - 1, parts[2]); // YYYY, MM, DD
             }
         }
-        
+
         if (isNaN(date.getTime())) {
             console.log('Unable to parse date for candidate at index', index, ':', dateStr);
             invalidDateRecords++;
             return;
         }
-        
+
         validRecords++;
         const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
         console.log('Valid date processed for candidate at index', index, ':', date, '->', monthKey);
-        
+
         if (!monthlyStats[monthKey]) {
             monthlyStats[monthKey] = {
                 applicants: 0,
@@ -2210,9 +2268,9 @@ function updateMonthlyStats(data) {
                 feedbackGiven: 0
             };
         }
-        
+
         monthlyStats[monthKey].applicants++;
-        
+
         switch (candidate['Application Status']) {
             case 'Accepted':
                 monthlyStats[monthKey].accepted++;
@@ -2227,31 +2285,31 @@ function updateMonthlyStats(data) {
                 monthlyStats[monthKey].joined++;
                 break;
         }
-        
+
         if (candidate['Reference Feedback']) {
             monthlyStats[monthKey].feedbackGiven++;
         }
     });
-    
+
     console.log('Valid records:', validRecords, 'Invalid date records:', invalidDateRecords);
     console.log('Monthly stats:', monthlyStats);
-    
+
     // Sort months chronologically
     const sortedMonths = Object.keys(monthlyStats).sort((a, b) => {
         const [monthA, yearA] = a.split(' ');
         const [monthB, yearB] = b.split(' ');
         return new Date(`${monthA} 1, ${yearA}`) - new Date(`${monthB} 1, ${yearB}`);
     });
-    
+
     console.log('Sorted months:', sortedMonths);
-    
+
     // Update table
     const tbody = document.getElementById('monthlyStatsBody');
     const tfoot = document.getElementById('monthlyStatsTotals');
-    
+
     console.log('Looking for monthlyStatsBody element:', tbody);
     console.log('Looking for monthlyStatsTotals element:', tfoot);
-    
+
     if (!tbody || !tfoot) {
         console.error('Monthly stats table elements not found');
         // Try to find them in another way
@@ -2264,9 +2322,9 @@ function updateMonthlyStats(data) {
         });
         return;
     }
-    
+
     tbody.innerHTML = '';
-    
+
     const totals = {
         applicants: 0,
         accepted: 0,
@@ -2274,21 +2332,21 @@ function updateMonthlyStats(data) {
         inNotice: 0,
         joined: 0
     };
-    
+
     const labels = [];
     const acceptedData = [];
     const rejectedData = [];
     const joinedData = [];
-    
+
     sortedMonths.forEach(month => {
         const stats = monthlyStats[month];
-        
+
         // Prepare chart data
         labels.push(month);
         acceptedData.push(stats.accepted);
         rejectedData.push(stats.rejected);
         joinedData.push(stats.joined);
-        
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${month}</td>
@@ -2299,13 +2357,13 @@ function updateMonthlyStats(data) {
             <td class="text-center">${stats.joined}</td>
         `;
         tbody.appendChild(row);
-        
+
         // Update totals
         Object.keys(totals).forEach(key => {
             totals[key] += stats[key];
         });
     });
-    
+
     // Add totals row
     tfoot.innerHTML = `
         <tr class="table-success fw-bold">
@@ -2317,7 +2375,7 @@ function updateMonthlyStats(data) {
             <td class="text-center">${totals.joined}</td>
         </tr>
     `;
-    
+
     // Render Monthly Stats Chart
     const monthlyCtx = document.getElementById('monthlyStatsChart');
     if (monthlyCtx && document.getElementById('viewType').value === 'chart') {
@@ -2337,15 +2395,15 @@ function updateMonthlyStats(data) {
             options: { responsive: true, maintainAspectRatio: false }
         });
     }
-    
+
     // Update key metrics
     updateKeyMetrics(totals, data);
-    
+
     // Update position statistics
     updatePositionStats(data);
 }
 
-    // Update Position Statistics Table
+// Update Position Statistics Table
 function updatePositionStats(data) {
     const positionStats = {};
 
@@ -2538,7 +2596,7 @@ function updateKeyMetrics(totals, data) {
                 console.warn('Chart.js is not loaded, skipping metrics chart rendering');
                 return;
             }
-            
+
             if (window.metricsChartInstance) {
                 window.metricsChartInstance.destroy();
             }
@@ -2615,7 +2673,7 @@ function updateApplicationStatusChart(data) {
             console.warn('Chart.js is not loaded, skipping application status chart rendering');
             return;
         }
-        
+
         if (window.applicationStatusChartInstance) {
             window.applicationStatusChartInstance.destroy();
         }
@@ -2684,13 +2742,13 @@ function updateReferenceFeedbackChart(data) {
 
     const ctx = document.getElementById('referenceFeedbackChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping reference feedback chart rendering');
         return;
     }
-    
+
     // Destroy existing chart if it exists
     if (window.referenceFeedbackChartInstance) {
         window.referenceFeedbackChartInstance.destroy();
@@ -2743,13 +2801,13 @@ function updateOverallDistributionChart(data) {
 
     const ctx = document.getElementById('overallDistributionChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping overall distribution chart rendering');
         return;
     }
-    
+
     // Destroy existing chart if it exists
     if (window.overallDistributionChartInstance) {
         window.overallDistributionChartInstance.destroy();
@@ -2808,7 +2866,7 @@ function updateInterviewStatusChart(data) {
 
     const ctx = document.getElementById('interviewStatusChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping interview status chart rendering');
@@ -2842,7 +2900,7 @@ function updateInterviewStatusChart(data) {
         }
     });
 }
-     
+
 
 // Experience Level Chart
 function updateExperienceChart(data) {
@@ -2855,7 +2913,7 @@ function updateExperienceChart(data) {
 
     const ctx = document.getElementById('experienceChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping experience chart rendering');
@@ -2898,7 +2956,7 @@ function updateExperienceChart(data) {
     });
 }
 
-                
+
 
 // Referral Source Chart
 function updateReferralSourceChart(data) {
@@ -2911,7 +2969,7 @@ function updateReferralSourceChart(data) {
 
     const ctx = document.getElementById('referralSourceChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping referral source chart rendering');
@@ -2957,7 +3015,7 @@ function updateNoticePeriodChart(data) {
 
     const ctx = document.getElementById('noticePeriodChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping notice period chart rendering');
@@ -3045,7 +3103,7 @@ function updateMonthlyTrendsChart(data) {
 
     const ctx = document.getElementById('monthlyTrendsChart');
     if (!ctx) return;
-    
+
     // Check if Chart.js is available
     if (typeof Chart === 'undefined') {
         console.warn('Chart.js is not loaded, skipping monthly trends chart rendering');
@@ -3299,13 +3357,13 @@ function showCandidateDetails(candidate, index, isAdmin) {
                         </div>
                     `;
 
-            } else {
-                // Check if field is editable (for remaining fields, only editable if admin)
-                const isEditable = isAdmin;
-                const editableClass = isEditable ? 'editable-field' : 'readonly-field';
-                const cursorStyle = isEditable ? 'cursor: pointer;' : 'cursor: default;';
+                } else {
+                    // Check if field is editable (for remaining fields, only editable if admin)
+                    const isEditable = isAdmin;
+                    const editableClass = isEditable ? 'editable-field' : 'readonly-field';
+                    const cursorStyle = isEditable ? 'cursor: pointer;' : 'cursor: default;';
 
-                detailsHTML += `
+                    detailsHTML += `
                     <div class="candidate-detail-item" data-candidate-index="${index}" data-field-name="${field}" data-editable="${isEditable}">
                         <span class="candidate-detail-label">${field}:</span>
                         <span class="candidate-detail-value display-mode ${editableClass}" id="display-${field.replace(/\s/g, '')}" style="${cursorStyle}">${displayValue}</span>
@@ -3531,12 +3589,12 @@ let currentRemarksValue = null;
 function showRemarksDetail(remarks, candidateIndex) {
     const modalContent = document.getElementById('remarksDetailContent');
     const saveBtn = document.getElementById('saveRemarksInModal');
-    
+
     if (modalContent && saveBtn) {
         // Store the current candidate index and remarks value
         currentRemarksCandidateIndex = candidateIndex;
         currentRemarksValue = remarks;
-        
+
         // Display the remarks text field directly for editing
         modalContent.innerHTML = `
             <div class="mb-3">
@@ -3544,10 +3602,10 @@ function showRemarksDetail(remarks, candidateIndex) {
                 <textarea class="form-control" id="remarksTextArea" rows="5">${remarks || ''}</textarea>
             </div>
         `;
-        
+
         // Add event listener for save button
         saveBtn.onclick = saveRemarksFromModal;
-        
+
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('remarksDetailModal'));
         modal.show();
@@ -3558,11 +3616,11 @@ function showRemarksDetail(remarks, candidateIndex) {
 function saveRemarksFromModal() {
     const remarksTextArea = document.getElementById('remarksTextArea');
     const newRemarksValue = remarksTextArea ? remarksTextArea.value : '';
-    
+
     if (currentRemarksCandidateIndex === null) return;
-    
+
     const updatedData = { Remarks: newRemarksValue };
-    
+
     fetch(`/api/data/${currentRemarksCandidateIndex}`, {
         method: 'PUT',
         headers: {
@@ -3570,36 +3628,36 @@ function saveRemarksFromModal() {
         },
         body: JSON.stringify(updatedData),
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showToast('Remarks updated successfully!', 'success');
-            // Update the table data
-            if (tableData[currentRemarksCandidateIndex]) {
-                tableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Remarks updated successfully!', 'success');
+                // Update the table data
+                if (tableData[currentRemarksCandidateIndex]) {
+                    tableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
+                }
+                // Also update original data
+                if (originalTableData[currentRemarksCandidateIndex]) {
+                    originalTableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
+                }
+
+                // Update the table cell directly
+                updateRemarksTableCell(currentRemarksCandidateIndex, newRemarksValue);
+
+                // Close the modal
+                const modalElement = document.getElementById('remarksDetailModal');
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+            } else {
+                showToast(`Error updating remarks: ${data.message}`, 'danger');
             }
-            // Also update original data
-            if (originalTableData[currentRemarksCandidateIndex]) {
-                originalTableData[currentRemarksCandidateIndex].Remarks = newRemarksValue;
-            }
-            
-            // Update the table cell directly
-            updateRemarksTableCell(currentRemarksCandidateIndex, newRemarksValue);
-            
-            // Close the modal
-            const modalElement = document.getElementById('remarksDetailModal');
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) {
-                modal.hide();
-            }
-        } else {
-            showToast(`Error updating remarks: ${data.message}`, 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving remarks:', error);
-        showToast('Error saving remarks.', 'danger');
-    });
+        })
+        .catch(error => {
+            console.error('Error saving remarks:', error);
+            showToast('Error saving remarks.', 'danger');
+        });
 }
 
 // Function to update the Remarks table cell directly
@@ -3670,4 +3728,36 @@ function formatFieldValue(field, value) {
         return '—';
     }
 }
-            
+
+
+// Function to update Offer Details table
+function updateOfferDetails(data) {
+    console.log('Updating Offer Details table...', data.length);
+    const tbody = document.getElementById('offerDetailsBodyIndex');
+    if (!tbody) {
+        console.warn('offerDetailsBodyIndex not found');
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    // Filter candidates with Offered CTC
+    const offers = data.filter(item => item['Offered CTC'] && item['Offered CTC'] !== '' && item['Offered CTC'] !== 'Nil' && item['Offered CTC'] !== 'No' && item['Offered CTC'] !== '0');
+
+    console.log('Found offers:', offers.length);
+
+    if (offers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No offer details available</td></tr>';
+        return;
+    }
+
+    offers.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item['Name'] || 'N/A'}</td>
+            <td>${item['Offered CTC']}</td>
+            <td>${item['Joining Date'] || 'N/A'}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
