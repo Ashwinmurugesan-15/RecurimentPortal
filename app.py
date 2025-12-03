@@ -577,6 +577,12 @@ def get_analytics_data():
             print(f"No year filter applied, returning all {len(data)} records")
         
         # Calculate metrics
+        # Filter data by position if specified
+        position_filter = request.args.get('position')
+        if position_filter:
+            data = [item for item in data if item.get('Interested Position') == position_filter]
+            print(f"Filtered data for position {position_filter}: {len(data)} records")
+
         total_applicant = len(data)
         total_rejected = sum(1 for item in data if item.get('Application Status') == 'Rejected')
         no_response = sum(1 for item in data if item.get('Application Status') == 'No Resp Call/Email')
